@@ -1,0 +1,129 @@
+name: build-release
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build-v1.3.18.6
+
+permissions:
+  contents: read
+
+env:
+  ASEPRITE_VERSION: 1.3.18.6
+
+jobs:
+  windows:
+    name: Windows x64
+    runs-on: windows-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: aseprite/get-ninja@main
+
+      - uses: TheMrMilchmann/setup-msvc-dev@v4
+        with:
+          arch: x64
+
+      - name: Download Skia
+        shell: bash
+        run: |
+          skia_url=$(source laf/misc/skia-url.sh windows x64 | xargs)
+          skia_file=$(basename "$skia_url")
+          curl --ssl-revoke-best-effort -L -o "$skia_file" "$skia_url"
+          unzip -q "$skia_file" -d skia
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DENABLE_TESTS=OFF \
+            -DENABLE_SCRIPTING=ON \
+            -DENABLE_CCACHE=OFF \
+            -DLAF_BACKEND=skia \
+            -DSKIA_DIR="$(realpath skia)" \
+            -DSKIA_LIBRARY_DIR="$(realpath skia/out/Release-x64)"
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --target aseprite
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/bin/aseprite.exe dist/
+          Copy-Item build/bin/data dist/data -Recurse
+          Compress-Archive -Path dist/* -DestinationPath "Aseprite-$env:ASEPRITE_VERSION-windows-x64.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Aseprite-${{ env.ASEPRITE_VERSION }}-windows-x64
+          path: Aseprite-${{ env.ASEPRITE_VERSION }}-windows-x64.zip
+          if-no-files-found: error
+          retention-days: 30
+
+  macos:
+    name: macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            arch: arm64
+            min_version: "11.0"
+          - os: macos-15-intel
+            arch: x64
+            min_version: "10.14"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - uses: aseprite/get-ninja@main
+
+      - name: Download Skia
+        shell: bash
+        run: |
+          skia_url=$(source laf/misc/skia-url.sh macos ${{ matrix.arch }} | xargs)
+          skia_file=$(basename "$skia_url")
+          curl -L -o "$skia_file" "$skia_url"
+          unzip -q "$skia_file" -d skia
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ matrix.min_version }} \
+            -DENABLE_TESTS=OFF \
+            -DENABLE_SCRIPTING=ON \
+            -DENABLE_CCACHE=OFF \
+            -DLAF_BACKEND=skia \
+            -DSKIA_DIR="$(realpath skia)" \
+            -DSKIA_LIBRARY_DIR="$(realpath skia/out/Release-${{ matrix.arch }})"
+
+      - name: Build
+        shell: bash
+        run: cmake --build build --target aseprite
+
+      - name: Package
+        shell: bash
+        run: |
+          codesign --force --deep --sign - build/bin/Aseprite.app
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/bin/Aseprite.app \
+            "Aseprite-${{ env.ASEPRITE_VERSION }}-macos-${{ matrix.arch }}.zip"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Aseprite-${{ env.ASEPRITE_VERSION }}-macos-${{ matrix.arch }}
+          path: Aseprite-${{ env.ASEPRITE_VERSION }}-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error
+          retention-days: 30
