@@ -534,9 +534,10 @@ gfx::Rect Entry::onGetEntryTextBounds() const
 {
   gfx::Rect bounds = clientBounds();
   bounds.x += border().left();
-  bounds.y += guiscaled_center(0, bounds.h, textHeight());
+  const int textHeight = ui::mergedMetrics(font()).height();
+  bounds.y += guiscaled_center(0, bounds.h, textHeight);
   bounds.w -= border().width();
-  bounds.h = textHeight();
+  bounds.h = textHeight;
   return bounds;
 }
 
