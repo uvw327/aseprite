@@ -59,18 +59,33 @@ jobs:
           Copy-Item build/bin/aseprite.exe dist/
           Copy-Item build/bin/data dist/data -Recurse
 
-          # Copy every non-system DLL that the executable (transitively) needs,
-          # so the package does not rely on anything preinstalled (OpenSSL, CRT).
+          # Collect non-system DLLs (OpenSSL, VC runtime) so the package does not
+          # rely on anything preinstalled on the user's machine.
           $searchDirs = @(
-            (Join-Path $env:VCToolsRedistDir 'x64\Microsoft.VC143.CRT'),
             "$env:ProgramFiles\OpenSSL\bin",
             "$env:ProgramFiles\OpenSSL-Win64\bin"
-          ) | Where-Object { $_ -and (Test-Path $_) }
+          )
+
+          # MSVC redistributable DLLs (libcrypto is built against the shared CRT)
+          $crtDirs = @()
+          if ($env:VCToolsRedistDir) {
+            $crtDirs = Get-ChildItem (Join-Path $env:VCToolsRedistDir 'x64') -Directory -Filter 'Microsoft.VC*.CRT' -ErrorAction SilentlyContinue |
+              Select-Object -ExpandProperty FullName
+          }
+          foreach ($dir in $crtDirs) {
+            Get-ChildItem $dir -Filter '*.dll' |
+              Where-Object { $_.Name -like 'msvcp140*' -or $_.Name -like 'vcruntime140*' } |
+              ForEach-Object { Copy-Item $_.FullName dist -Force }
+          }
+
+          $searchDirs = @($crtDirs) + $searchDirs |
+            Where-Object { $_ -and (Test-Path $_) }
 
           function Add-DllDependencies([string]$file) {
             $out = dumpbin /dependents $file | Out-String
             foreach ($m in [regex]::Matches($out, '(?im)^\s{2,}([\w\-.]+\.dll)\s*$')) {
               $dll = $m.Groups[1].Value
+              if ($dll -match '(?i)^api-ms-win-') { continue }  # UCRT, part of Windows 10+
               if (Test-Path (Join-Path dist $dll)) { continue }
               if (Test-Path (Join-Path $env:SystemRoot "System32\$dll")) { continue }
               $src = $searchDirs |
@@ -100,6 +115,9 @@ jobs:
           Write-Host ("Bundled DLLs: " + ($bundled -join ", "))
           if ($bundled -notcontains "libcrypto-3-x64.dll") {
             throw "libcrypto-3-x64.dll is not bundled"
+          }
+          if ($bundled -notcontains "vcruntime140.dll") {
+            throw "VC runtime (vcruntime140.dll) is not bundled"
           }
           Get-ChildItem dist | Select-Object Name, Length
 
