@@ -45,7 +45,6 @@ jobs:
             -DENABLE_SCRIPTING=ON \
             -DENABLE_CCACHE=OFF \
             -DLAF_BACKEND=skia \
-            -DENABLE_OPENSSL=OFF \
             -DSKIA_DIR="$(realpath skia)" \
             -DSKIA_LIBRARY_DIR="$(realpath skia/out/Release-x64)"
 
@@ -53,23 +52,56 @@ jobs:
         shell: bash
         run: cmake --build build --target aseprite
 
-      - name: Check DLL dependencies
-        shell: pwsh
-        run: |
-          $deps = dumpbin /dependents build/bin/aseprite.exe | Out-String
-          $deps
-          if ($deps -match "(?i)libcrypto|libssl|libcurl") {
-            Write-Error "Unexpected non-system DLL dependency"
-            exit 1
-          }
-
       - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item build/bin/aseprite.exe dist/
           Copy-Item build/bin/data dist/data -Recurse
+
+          # Copy every non-system DLL that the executable (transitively) needs,
+          # so the package does not rely on anything preinstalled (OpenSSL, CRT).
+          $searchDirs = @(
+            (Join-Path $env:VCToolsRedistDir 'x64\Microsoft.VC143.CRT'),
+            "$env:ProgramFiles\OpenSSL\bin",
+            "$env:ProgramFiles\OpenSSL-Win64\bin"
+          ) | Where-Object { $_ -and (Test-Path $_) }
+
+          function Add-DllDependencies([string]$file) {
+            $out = dumpbin /dependents $file | Out-String
+            foreach ($m in [regex]::Matches($out, '(?im)^\s{2,}([\w\-.]+\.dll)\s*$')) {
+              $dll = $m.Groups[1].Value
+              if (Test-Path (Join-Path dist $dll)) { continue }
+              if (Test-Path (Join-Path $env:SystemRoot "System32\$dll")) { continue }
+              $src = $searchDirs |
+                ForEach-Object { Join-Path $_ $dll } |
+                Where-Object { Test-Path $_ } |
+                Select-Object -First 1
+              if (-not $src) {
+                $src = & where.exe $dll 2>$null | Select-Object -First 1
+              }
+              if (-not $src) {
+                throw "Dependency '$dll' of '$file' could not be located"
+              }
+              Copy-Item $src (Join-Path dist $dll)
+              Write-Host "Bundled $dll <- $src"
+              Add-DllDependencies (Join-Path dist $dll)
+            }
+          }
+          Add-DllDependencies (Resolve-Path dist/aseprite.exe)
+
           Compress-Archive -Path dist/* -DestinationPath "Aseprite-$env:ASEPRITE_VERSION-windows-x64.zip"
+
+      - name: Verify package
+        shell: pwsh
+        run: |
+          dumpbin /dependents build/bin/aseprite.exe
+          $bundled = Get-ChildItem dist -Filter *.dll | Select-Object -ExpandProperty Name
+          Write-Host ("Bundled DLLs: " + ($bundled -join ", "))
+          if ($bundled -notcontains "libcrypto-3-x64.dll") {
+            throw "libcrypto-3-x64.dll is not bundled"
+          }
+          Get-ChildItem dist | Select-Object Name, Length
 
       - uses: actions/upload-artifact@v7
         with:
