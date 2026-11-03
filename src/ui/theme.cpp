@@ -18,6 +18,7 @@
 #include "os/system.h"
 #include "text/font.h"
 #include "text/font_metrics.h"
+#include "ui/font_utils.h"
 #include "ui/intern.h"
 #include "ui/manager.h"
 #include "ui/paint_event.h"
@@ -667,7 +668,8 @@ void Theme::measureLayer(const Widget* widget,
         const text::FontRef& styleFont = style->font();
         gfx::Size textSize;
         if (styleFont && styleFont != widget->font()) {
-          textSize = gfx::Size(styleFont->textLength(widget->text()), styleFont->lineHeight());
+          textSize = gfx::Size(styleFont->textLength(widget->text()),
+                               ui::mergedLineHeight(styleFont));
         }
         else {
           // We can use Widget::textSize() because we're going to use
@@ -895,7 +897,7 @@ void Theme::drawTextBox(Graphics* g,
   int x, y, chr, len;
   gfx::Point scroll;
   const text::FontRef& font = widget->font();
-  const int lineheight = font->lineHeight();
+  const int lineheight = ui::mergedLineHeight(font);
   char *beg_end, *old_end;
   int width;
   gfx::Rect vp;

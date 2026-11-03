@@ -18,6 +18,7 @@ add_library(ui-lib
   entry.cpp
   event.cpp
   fit_bounds.cpp
+  font_utils.cpp
   graphics.cpp
   grid.cpp
   image_view.cpp

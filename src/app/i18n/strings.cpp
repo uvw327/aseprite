@@ -20,6 +20,7 @@
 #include "base/debug.h"
 #include "base/fs.h"
 #include "cfg/cfg.h"
+#include "ui/font_utils.h"
 
 #include <algorithm>
 
@@ -152,6 +153,10 @@ std::string Strings::VFormat(const char* id, const fmt::format_args& vargs)
 
 void Strings::loadLanguage(const std::string& langId)
 {
+  // CJK languages use a taller fallback font, so widgets must take the
+  // fallback metrics into account (English keeps the classic layout).
+  ui::setUseFallbackMetrics(langId.rfind("zh", 0) == 0);
+
   m_strings.clear();
   loadStringsFromDataDir(kDefLanguage);
   m_default = m_strings;

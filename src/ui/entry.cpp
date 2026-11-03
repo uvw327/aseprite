@@ -17,6 +17,7 @@
 #include "text/font.h"
 #include "text/font_metrics.h"
 #include "ui/display.h"
+#include "ui/font_utils.h"
 #include "ui/menu.h"
 #include "ui/message.h"
 #include "ui/scale.h"
@@ -461,7 +462,7 @@ gfx::Size Entry::sizeHintWithText(Entry* entry, const std::string& text)
 
   w = std::min(w, guiscale() * kMaxWidthHintForEntry);
 
-  const int h = font->lineHeight() + entry->border().height();
+  const int h = ui::mergedLineHeight(font) + entry->border().height();
 
   return gfx::Size(w, h);
 }
@@ -487,7 +488,7 @@ void Entry::onSizeHint(SizeHintEvent& ev)
 
   w = std::min(w, guiscale() * kMaxWidthHintForEntry);
 
-  int h = font->lineHeight() + border().height();
+  int h = ui::mergedLineHeight(font) + border().height();
 
   ev.setSizeHint(w, h);
 }
@@ -515,8 +516,7 @@ void Entry::onSetText()
 
 float Entry::onGetTextBaseline() const
 {
-  text::FontMetrics metrics;
-  font()->metrics(&metrics);
+  const auto metrics = ui::mergedMetrics(font());
   // Here we only use the descent+ascent to measure the text height,
   // without the metrics.leading part (which is the used to separate
   // text lines in a paragraph, but here'd make widgets too big)
