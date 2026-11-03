@@ -45,12 +45,23 @@ jobs:
             -DENABLE_SCRIPTING=ON \
             -DENABLE_CCACHE=OFF \
             -DLAF_BACKEND=skia \
+            -DENABLE_OPENSSL=OFF \
             -DSKIA_DIR="$(realpath skia)" \
             -DSKIA_LIBRARY_DIR="$(realpath skia/out/Release-x64)"
 
       - name: Build
         shell: bash
         run: cmake --build build --target aseprite
+
+      - name: Check DLL dependencies
+        shell: pwsh
+        run: |
+          $deps = dumpbin /dependents build/bin/aseprite.exe | Out-String
+          $deps
+          if ($deps -match "(?i)libcrypto|libssl|libcurl") {
+            Write-Error "Unexpected non-system DLL dependency"
+            exit 1
+          }
 
       - name: Package
         shell: pwsh
