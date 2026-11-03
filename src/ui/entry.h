@@ -80,6 +80,7 @@ public:
 
   void setPlaceholder(const std::string& placeholder);
   const std::string& placeholder();
+  const std::string& placeholder() const;
 
   // Signals
   obs::signal<void()> Change;

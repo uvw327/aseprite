@@ -478,6 +478,11 @@ const std::string& Entry::placeholder()
   return m_placeholder;
 }
 
+const std::string& Entry::placeholder() const
+{
+  return m_placeholder;
+}
+
 void Entry::onSizeHint(SizeHintEvent& ev)
 {
   const auto& font = this->font();
