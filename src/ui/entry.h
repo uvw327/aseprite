@@ -69,6 +69,10 @@ public:
   void getEntryThemeInfo(int* scroll, int* caret, int* state, Range* range) const;
   gfx::Rect getEntryTextBounds() const;
 
+  // Blob used to measure/center the text that is actually painted: the
+  // widget text, or the placeholder text when the entry is empty.
+  text::TextBlobRef displayBlob() const;
+
   gfx::PointF scale() const { return m_scale; }
   void setScale(const gfx::PointF& scale) { m_scale = scale; }
 
@@ -151,6 +155,8 @@ private:
   gfx::PointF m_scale;
 
   std::string m_placeholder;
+  mutable text::TextBlobRef m_placeholderBlob;
+  mutable std::string m_placeholderBlobText;
 };
 
 } // namespace ui

@@ -50,6 +50,7 @@
 #include "tinyxml2.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -1501,8 +1502,9 @@ void SkinTheme::drawEntryText(ui::Graphics* g, ui::Entry* widget)
   // Draw the text
   gfx::Rect bounds = widget->getEntryTextBounds();
 
-  auto blob = widget->textBlob();
-  const int textHeight = blob ? widget->textHeight() : ui::mergedMetrics(widget->font()).height();
+  auto blob = widget->displayBlob();
+  const int textHeight = blob ? int(std::ceil(blob->textHeight()))
+                              : ui::mergedMetrics(widget->font()).height();
   DrawEntryTextDelegate delegate(widget, g, bounds.origin(), textHeight);
   int scroll = delegate.index();
 

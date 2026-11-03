@@ -29,6 +29,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdarg>
 #include <cstdio>
 #include <memory>
@@ -520,12 +521,12 @@ float Entry::onGetTextBaseline() const
 
   // Center the actual TextBlob (the text may use a different font than the
   // widget, e.g. the CJK fallback), so ASCII and CJK are always centered
-  // inside the entry regardless of the fallback metrics.
-  if (auto blob = textBlob())
+  // inside the entry regardless of the fallback metrics. When the entry is
+  // empty, the placeholder blob is used for the same reason.
+  if (auto blob = displayBlob())
     return guiscaled_center(rc.y, rc.h, blob->textHeight()) + blob->baseline();
 
-  // No text (e.g. placeholder): use the merged metrics so the placeholder
-  // is positioned like the text that will replace it.
+  // No text at all: use the merged metrics.
   const auto metrics = ui::mergedMetrics(font());
   const float textHeight = metrics.descent - metrics.ascent;
   return guiscaled_center(rc.y, rc.h, textHeight) - metrics.ascent;
@@ -542,12 +543,33 @@ gfx::Rect Entry::onGetEntryTextBounds() const
   bounds.x += border().left();
 
   // Use the real text height when there's text (so ASCII is not clipped by
-  // the CJK fallback height), or the merged height for the placeholder.
-  const int h = (textBlob() ? textHeight() : ui::mergedMetrics(font()).height());
+  // the CJK fallback height), or the merged height when there's nothing.
+  auto blob = displayBlob();
+  const int h = blob ? int(std::ceil(blob->textHeight()))
+                     : ui::mergedMetrics(font()).height();
   bounds.y += guiscaled_center(0, bounds.h, h);
   bounds.w -= border().width();
   bounds.h = h;
   return bounds;
+}
+
+text::TextBlobRef Entry::displayBlob() const
+{
+  if (auto blob = textBlob())
+    return blob;
+
+  if (isReadOnly() || !text().empty() || placeholder().empty())
+    return nullptr;
+
+  if (!m_placeholderBlob || m_placeholderBlobText != placeholder()) {
+    m_placeholderBlob = text::TextBlob::MakeWithShaper(theme()->fontMgr(),
+                                                       font(),
+                                                       placeholder(),
+                                                       nullptr,
+                                                       onGetTextShaperFeatures());
+    m_placeholderBlobText = placeholder();
+  }
+  return m_placeholderBlob;
 }
 
 int Entry::getCaretFromMouse(MouseMessage* mouseMsg)
