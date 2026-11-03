@@ -30,18 +30,26 @@
     <fallback font="Unicode Japanese" size="8" />
   </font>
 
+  <font name="Cubic 11"
+        type="truetype"
+        file="Cubic_11.ttf"
+        antialias="false"
+        hinting="false">
+    <fallback font="Unicode" size="14" />
+  </font>
+
   <font name="Aseprite"
         type="spritesheet"
         descent="2"
         file="aseprite_font.png">
-    <fallback font="Unicode" size="14" />
+    <fallback font="Cubic 11" size="11" />
   </font>
 
   <font name="Aseprite Mini"
         type="spritesheet"
         descent="1"
         file="aseprite_mini.png">
-    <fallback font="Unicode" size="10" />
+    <fallback font="Cubic 11" size="11" />
   </font>
 
 </fonts>
