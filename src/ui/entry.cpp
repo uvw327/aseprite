@@ -516,12 +516,18 @@ void Entry::onSetText()
 
 float Entry::onGetTextBaseline() const
 {
-  const auto metrics = ui::mergedMetrics(font());
-  // Here we only use the descent+ascent to measure the text height,
-  // without the metrics.leading part (which is the used to separate
-  // text lines in a paragraph, but here'd make widgets too big)
-  const float textHeight = metrics.descent - metrics.ascent;
   const gfx::Rect rc = getEntryTextBounds();
+
+  // Center the actual TextBlob (the text may use a different font than the
+  // widget, e.g. the CJK fallback), so ASCII and CJK are always centered
+  // inside the entry regardless of the fallback metrics.
+  if (auto blob = textBlob())
+    return guiscaled_center(rc.y, rc.h, blob->textHeight()) + blob->baseline();
+
+  // No text (e.g. placeholder): use the merged metrics so the placeholder
+  // is positioned like the text that will replace it.
+  const auto metrics = ui::mergedMetrics(font());
+  const float textHeight = metrics.descent - metrics.ascent;
   return guiscaled_center(rc.y, rc.h, textHeight) - metrics.ascent;
 }
 
@@ -534,10 +540,13 @@ gfx::Rect Entry::onGetEntryTextBounds() const
 {
   gfx::Rect bounds = clientBounds();
   bounds.x += border().left();
-  const int textHeight = ui::mergedMetrics(font()).height();
-  bounds.y += guiscaled_center(0, bounds.h, textHeight);
+
+  // Use the real text height when there's text (so ASCII is not clipped by
+  // the CJK fallback height), or the merged height for the placeholder.
+  const int h = (textBlob() ? textHeight() : ui::mergedMetrics(font()).height());
+  bounds.y += guiscaled_center(0, bounds.h, h);
   bounds.w -= border().width();
-  bounds.h = textHeight;
+  bounds.h = h;
   return bounds;
 }
 

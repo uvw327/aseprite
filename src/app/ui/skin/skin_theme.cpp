@@ -43,6 +43,7 @@
 #include "text/font_metrics.h"
 #include "text/font_style_set.h"
 #include "text/text_blob.h"
+#include "ui/font_utils.h"
 #include "ui/intern.h"
 #include "ui/ui.h"
 
@@ -1500,7 +1501,9 @@ void SkinTheme::drawEntryText(ui::Graphics* g, ui::Entry* widget)
   // Draw the text
   gfx::Rect bounds = widget->getEntryTextBounds();
 
-  DrawEntryTextDelegate delegate(widget, g, bounds.origin(), widget->textHeight());
+  auto blob = widget->textBlob();
+  const int textHeight = blob ? widget->textHeight() : ui::mergedMetrics(widget->font()).height();
+  DrawEntryTextDelegate delegate(widget, g, bounds.origin(), textHeight);
   int scroll = delegate.index();
 
   const std::string& fullText = widget->text() + widget->getSuffix();
@@ -1518,13 +1521,12 @@ void SkinTheme::drawEntryText(ui::Graphics* g, ui::Entry* widget)
     IntersectClip clip(g, bounds);
     if (clip) {
       int baselineAdjustment = widget->textBaseline();
-      if (auto blob = widget->textBlob()) {
+      if (blob) {
         baselineAdjustment -= blob->baseline();
       }
       else {
-        text::FontMetrics metrics;
-        widget->font()->metrics(&metrics);
-        baselineAdjustment += metrics.ascent;
+        // Placeholder: use the same merged metrics as Entry::onGetTextBaseline()
+        baselineAdjustment += ui::mergedMetrics(widget->font()).ascent;
       }
 
       g->drawTextWithDelegate(std::string(pos, paintText.end()), // TODO use a string_view()
